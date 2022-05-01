@@ -24,8 +24,7 @@ import org.junit.Test
 import org.junit.rules.TemporaryFolder
 import java.io.File
 import java.nio.file.FileSystems
-import java.util.ArrayList
-import java.util.Collections
+import java.util.*
 
 class WireCompilerTest {
   @Rule @JvmField val temp = TemporaryFolder()
@@ -404,6 +403,15 @@ class WireCompilerTest {
   }
 
   @Test
+  fun testPersonKotlinBinding() {
+    val sources = arrayOf("person.proto")
+    compileToBinding(sources)
+
+    val outputs = arrayOf("com/squareup/wire/protos/kotlin/person/Person.kt")
+    assertKotlinOutputs(outputs)
+  }
+
+  @Test
   fun testPersonAndroidKotlin() {
     val sources = arrayOf("person.proto")
     compileToKotlin(sources, "--android")
@@ -544,6 +552,9 @@ class WireCompilerTest {
   private fun compileToKotlin(sources: Array<String>, vararg extraArgs: String) =
       invokeCompiler(TargetLanguage.KOTLIN, sources, *extraArgs)
 
+  private fun compileToBinding(sources: Array<String>, vararg extraArgs: String) =
+    invokeCompiler(TargetLanguage.BINDING, sources, *extraArgs)
+
   private fun invokeCompiler(
     target: TargetLanguage,
     sources: Array<String>,
@@ -624,6 +635,11 @@ class WireCompilerTest {
     KOTLIN {
       override fun protoPathArg() = "--proto_path=../wire-tests/src/commonTest/proto/kotlin"
       override fun outArg(testDirPath: String) = "--kotlin_out=$testDirPath"
+      override fun protoFolderSuffix() = "kotlin"
+    },
+    BINDING {
+      override fun protoPathArg() = "--proto_path=../wire-tests/src/commonTest/proto/kotlin"
+      override fun outArg(testDirPath: String) = "--binding_out=$testDirPath"
       override fun protoFolderSuffix() = "kotlin"
     };
 

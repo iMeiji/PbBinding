@@ -17,6 +17,7 @@ package com.squareup.wire
 
 import com.squareup.wire.java.JavaGenerator
 import com.squareup.wire.java.ProfileLoader
+import com.squareup.wire.kotlin.BindingGenerator
 import com.squareup.wire.kotlin.KotlinGenerator
 import com.squareup.wire.schema.IdentifierSet
 import com.squareup.wire.schema.SchemaLoader
@@ -29,7 +30,6 @@ import java.io.FileNotFoundException
 import java.io.IOException
 import java.nio.file.FileSystem
 import java.nio.file.FileSystems
-import java.util.ArrayList
 import java.util.concurrent.ConcurrentLinkedQueue
 import java.util.concurrent.ExecutionException
 import java.util.concurrent.Executors
@@ -89,6 +89,7 @@ class WireCompiler internal constructor(
   val protoPaths: List<String>,
   val javaOut: String?,
   val kotlinOut: String?,
+  val bindingOut: String?,
   val sourceFileNames: List<String>,
   val identifierSet: IdentifierSet,
   val dryRun: Boolean,
@@ -165,6 +166,17 @@ class WireCompiler internal constructor(
         }
       }
 
+      bindingOut != null -> {
+        val bindingGenerator = BindingGenerator(schema, emitAndroid, javaInterop)
+
+        // No services for Binding.
+        val types = ConcurrentLinkedQueue(queue.filterIsInstance<PendingTypeFileSpec>())
+        for (i in 0 until MAX_WRITE_CONCURRENCY) {
+          val task = BindingFileWriter(bindingOut, bindingGenerator, types, fs, log, dryRun)
+          futures.add(executor.submit(task))
+        }
+      }
+
       else -> throw AssertionError()
     }
 
@@ -188,6 +200,7 @@ class WireCompiler internal constructor(
     private const val PROTO_PATH_FLAG = "--proto_path="
     private const val JAVA_OUT_FLAG = "--java_out="
     private const val KOTLIN_OUT_FLAG = "--kotlin_out="
+    private const val BINDING_OUT_FLAG = "--binding_out="
     private const val FILES_FLAG = "--files="
     private const val INCLUDES_FLAG = "--includes="
     private const val EXCLUDES_FLAG = "--excludes="
@@ -226,6 +239,7 @@ class WireCompiler internal constructor(
       val protoPaths = mutableListOf<String>()
       var javaOut: String? = null
       var kotlinOut: String? = null
+      var bindingOut: String? = null
       var quiet = false
       var dryRun = false
       var namedFilesOnly = false
@@ -248,6 +262,11 @@ class WireCompiler internal constructor(
           arg.startsWith(KOTLIN_OUT_FLAG) -> {
             check(kotlinOut == null) { "kotlin_out already set" }
             kotlinOut = arg.substring(KOTLIN_OUT_FLAG.length)
+          }
+
+          arg.startsWith(BINDING_OUT_FLAG) -> {
+            check(bindingOut == null) { "binding_out already set" }
+            bindingOut = arg.substring(BINDING_OUT_FLAG.length)
           }
 
           arg.startsWith(FILES_FLAG) -> {
@@ -286,15 +305,17 @@ class WireCompiler internal constructor(
         }
       }
 
-      if ((javaOut != null) == (kotlinOut != null)) {
-        throw WireException("Only one of $JAVA_OUT_FLAG or $KOTLIN_OUT_FLAG flag must be specified")
-      }
+//      if ((javaOut != null) == (kotlinOut != null)) {
+//        throw WireException("Only one of $JAVA_OUT_FLAG or $KOTLIN_OUT_FLAG flag must be specified")
+//      }
 
       logger.setQuiet(quiet)
 
-      return WireCompiler(fileSystem, logger, protoPaths, javaOut, kotlinOut, sourceFileNames,
-          identifierSetBuilder.build(), dryRun, namedFilesOnly, emitAndroid, emitAndroidAnnotations,
-          emitCompact, javaInterop)
+      return WireCompiler(
+        fileSystem, logger, protoPaths, javaOut, kotlinOut, bindingOut, sourceFileNames,
+        identifierSetBuilder.build(), dryRun, namedFilesOnly, emitAndroid, emitAndroidAnnotations,
+        emitCompact, javaInterop
+      )
     }
   }
 }
