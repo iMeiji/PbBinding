@@ -30,3 +30,7 @@ internal val Field.keyType: ProtoType
 
 internal val Field.valueType: ProtoType
   get() = type().valueType()
+
+// 基本数据类型
+internal val Field.isScalar: Boolean
+  get() = type().isScalar

@@ -15,34 +15,11 @@
  */
 package com.squareup.wire.kotlin
 
-import com.squareup.kotlinpoet.ANY
-import com.squareup.kotlinpoet.AnnotationSpec
+import com.squareup.kotlinpoet.*
 import com.squareup.kotlinpoet.AnnotationSpec.UseSiteTarget.FIELD
-import com.squareup.kotlinpoet.BOOLEAN
-import com.squareup.kotlinpoet.ClassName
-import com.squareup.kotlinpoet.CodeBlock
-import com.squareup.kotlinpoet.DOUBLE
-import com.squareup.kotlinpoet.FLOAT
-import com.squareup.kotlinpoet.FunSpec
-import com.squareup.kotlinpoet.INT
-import com.squareup.kotlinpoet.KModifier
 import com.squareup.kotlinpoet.KModifier.*
-import com.squareup.kotlinpoet.LONG
-import com.squareup.kotlinpoet.MemberName
 import com.squareup.kotlinpoet.MemberName.Companion.member
-import com.squareup.kotlinpoet.NOTHING
-import com.squareup.kotlinpoet.NameAllocator
-import com.squareup.kotlinpoet.ParameterSpec
-import com.squareup.kotlinpoet.ParameterizedTypeName
 import com.squareup.kotlinpoet.ParameterizedTypeName.Companion.parameterizedBy
-import com.squareup.kotlinpoet.PropertySpec
-import com.squareup.kotlinpoet.STRING
-import com.squareup.kotlinpoet.TypeName
-import com.squareup.kotlinpoet.TypeSpec
-import com.squareup.kotlinpoet.asClassName
-import com.squareup.kotlinpoet.asTypeName
-import com.squareup.kotlinpoet.buildCodeBlock
-import com.squareup.kotlinpoet.joinToCode
 import com.squareup.kotlinpoet.jvm.jvmField
 import com.squareup.kotlinpoet.jvm.jvmStatic
 import com.squareup.wire.EnumAdapter
@@ -58,26 +35,15 @@ import com.squareup.wire.ProtoWriter
 import com.squareup.wire.WireEnum
 import com.squareup.wire.WireField
 import com.squareup.wire.WireRpc
-import com.squareup.wire.schema.EnclosingType
-import com.squareup.wire.schema.EnumType
-import com.squareup.wire.schema.Field
-import com.squareup.wire.schema.MessageType
-import com.squareup.wire.schema.OneOf
+import com.squareup.wire.schema.*
 import com.squareup.wire.schema.Options.ENUM_VALUE_OPTIONS
-import com.squareup.wire.schema.ProtoFile
-import com.squareup.wire.schema.ProtoMember
-import com.squareup.wire.schema.ProtoType
-import com.squareup.wire.schema.Rpc
-import com.squareup.wire.schema.Schema
-import com.squareup.wire.schema.Service
-import com.squareup.wire.schema.Type
 import kotlinx.coroutines.Deferred
 import kotlinx.coroutines.channels.ReceiveChannel
 import kotlinx.coroutines.channels.SendChannel
 import okio.ByteString
 import okio.ByteString.Companion.encode
 import java.math.BigInteger
-import java.util.Locale
+import java.util.*
 
 class BindingGenerator private constructor(
   val schema: Schema,
@@ -259,7 +225,7 @@ class BindingGenerator private constructor(
               newName("CREATOR", "CREATOR")
             }
             message.fieldsAndOneOfFields().forEach { field ->
-              newName(field.name(), field)
+              newName(field.name().snakeToLowerCamelCase(), field)
             }
           }
         }
@@ -279,44 +245,7 @@ class BindingGenerator private constructor(
 //    addDefaultFields(type, companionBuilder, nameAllocator)
 //    addAdapter(type, companionBuilder)
 
-    fun addConvertMethod(
-      type: MessageType,
-      companionBuilder: TypeSpec.Builder,
-      nameAllocator: NameAllocator
-    ) {
-        val className = generatedTypeName(type)
-        val pbClassNameString = type.typeName.toString().replace(postfix,"")
-        val result = FunSpec.builder("convert")
-          .addParameter(ParameterSpec.builder("pb", ClassName.bestGuess(pbClassNameString)).build())
-          .returns(type.typeName)
-        val fieldNames = mutableListOf<String>()
-
-        val body = buildCodeBlock {
-            add("val binding = %T()",type.typeName)
-                .add(".apply{")
-                .add("\n")
-            indent()
-            val fields = type.fieldsAndOneOfFields()
-            for (field in fields) {
-                val fieldName = nameAllocator[field]
-                add("this.%1N = pb.%2N,\n", fieldName, fieldName)
-            }
-            unindent()
-            add("} \n")
-            add("return %N", "binding")
-        }
-        result.addCode(body)
-
-//        result.addParameter(ParameterSpec.builder("unknownFields", ByteString::class)
-//          .defaultValue("this.unknownFields")
-//          .build())
-//        fieldNames += "unknownFields"
-//        result.addStatement("return %L", fieldNames
-//          .joinToString(prefix = className.simpleName + "(", postfix = ")"))
-        companionBuilder.addFunction(result.build())
-    }
-
-    addConvertMethod(type, companionBuilder, nameAllocator)
+      addConvertMethod(type, companionBuilder, nameAllocator)
 
     val classBuilder = TypeSpec.classBuilder(className)
         .apply { if (type.documentation().isNotBlank()) addKdoc("%L\n", type.documentation()) }
@@ -631,43 +560,95 @@ class BindingGenerator private constructor(
         .addStatement("this.%1L = %1L", fieldName)
         .apply {
           if (oneOf != null) {
-            for (other in oneOf.fields()) {
-              if (field != other) {
-                addStatement("this.%L = null", nameAllocator[other])
+              for (other in oneOf.fields()) {
+                  if (field != other) {
+                      addStatement("this.%L = null", nameAllocator[other])
+                  }
               }
-            }
           }
         }
         .addStatement("return this")
         .build()
   }
 
-  /**
-   * Example
-   * ```
-   * class Person(
-   *   val name: String,
-   *   val email: String? = null,
-   *   val phone: List<PhoneNumber> = emptyList(),
-   *   unknownFields: ByteString = ByteString.EMPTY
-   * )
-   * ```
-   */
-  private fun addMessageConstructor(message: MessageType, classBuilder: TypeSpec.Builder) {
-    val constructorBuilder = FunSpec.constructorBuilder()
-    val nameAllocator = nameAllocator(message)
-    val byteClass = ProtoType.BYTES.typeName
+    private fun addConvertMethod(
+        type: MessageType,
+        companionBuilder: TypeSpec.Builder,
+        nameAllocator: NameAllocator
+    ) {
+        val className = generatedTypeName(type)
+        type.type().simpleName()
+        val pbClassNameString = type.typeName.toString().replace(postfix, "")
+        val result = FunSpec.builder("convert")
+            .addParameter(
+                ParameterSpec.builder("pb", ClassName.bestGuess(pbClassNameString)).build()
+            )
+            .returns(type.typeName)
+        val fieldNames = mutableListOf<String>()
 
-    val fields = message.fieldsAndOneOfFields()
+        val body = buildCodeBlock {
+            add("val binding = %T()", type.typeName)
+                .add(".apply{")
+                .add("\n")
+            indent()
+            val fields = type.fieldsAndOneOfFields()
+            for (field in fields) {
+                val fieldName = nameAllocator[field]
+                if (field.isRepeated) { // list
+                    val itemType = field.type().typeName
+                    if (field.isScalar) {
+                        add(
+                            "this.%1N = pb.%2N.mapNotNull{%3T}\n",
+                            fieldName,
+                            fieldName,
+                            itemType
+                        )
+                    } else {
+                        add(
+                            "this.%1N = pb.%2N.mapNotNull{%3T.convert(it)}\n",
+                            fieldName,
+                            fieldName,
+                            itemType
+                        )
+                    }
+                } else {
+                    add("this.%1N = pb.%2N\n", fieldName, fieldName)
+                }
+            }
+            unindent()
+            add("} \n")
+            add("return %N", "binding")
+        }
+        result.addCode(body)
+        companionBuilder.addFunction(result.build())
+    }
 
-    fields.forEach { field ->
-      val fieldClass = field.typeName
-      val fieldName = nameAllocator[field]
+    /**
+     * Example
+     * ```
+     * class Person(
+     *   val name: String,
+     *   val email: String? = null,
+     *   val phone: List<PhoneNumber> = emptyList(),
+     *   unknownFields: ByteString = ByteString.EMPTY
+     * )
+     * ```
+     */
+    private fun addMessageConstructor(message: MessageType, classBuilder: TypeSpec.Builder) {
+        val constructorBuilder = FunSpec.constructorBuilder()
+        val nameAllocator = nameAllocator(message)
+        val byteClass = ProtoType.BYTES.typeName
 
-      val parameterSpec = ParameterSpec.builder(fieldName, fieldClass)
-      if (!field.isRequired) {
-        parameterSpec.defaultValue(field.defaultValue)
-      }
+        val fields = message.fieldsAndOneOfFields()
+
+        fields.forEach { field ->
+            val fieldClass = field.typeName
+            val fieldName = nameAllocator[field]
+
+            val parameterSpec = ParameterSpec.builder(fieldName, fieldClass)
+            if (!field.isRequired) {
+                parameterSpec.defaultValue(field.defaultValue)
+            }
 
 //      if (field.isDeprecated) {
 //        parameterSpec.addAnnotation(AnnotationSpec.builder(Deprecated::class)
@@ -683,6 +664,7 @@ class BindingGenerator private constructor(
 
       constructorBuilder.addParameter(parameterSpec.build())
       classBuilder.addProperty(PropertySpec.builder(fieldName, fieldClass)
+          .mutable()
           .initializer(fieldName)
           .apply {
             if (field.documentation().isNotBlank()) {
@@ -692,11 +674,11 @@ class BindingGenerator private constructor(
           .build())
     }
 
-    val unknownFields = nameAllocator["unknownFields"]
-    constructorBuilder.addParameter(
-        ParameterSpec.builder(unknownFields, byteClass)
-            .defaultValue("%T.EMPTY", byteClass)
-            .build())
+//    val unknownFields = nameAllocator["unknownFields"]
+//    constructorBuilder.addParameter(
+//        ParameterSpec.builder(unknownFields, byteClass)
+//            .defaultValue("%T.EMPTY", byteClass)
+//            .build())
 
     classBuilder.primaryConstructor(constructorBuilder.build())
   }
@@ -1083,45 +1065,45 @@ class BindingGenerator private constructor(
           return CodeBlock.of("value.%N.%M(%L)", fieldName, redactElements, adapterName)
         }
       } else {
-        val adapterName = getAdapterName()
-        return if (isRequired) {
-          CodeBlock.of("%L.redact(value.%N)", adapterName, fieldName)
-        } else {
-          CodeBlock.of("value.%N?.let(%L::redact)", fieldName, adapterName)
-        }
+          val adapterName = getAdapterName()
+          return if (isRequired) {
+              CodeBlock.of("%L.redact(value.%N)", adapterName, fieldName)
+          } else {
+              CodeBlock.of("value.%N?.let(%L::redact)", fieldName, adapterName)
+          }
       }
     }
-    return null
+      return null
   }
 
-  // TODO add support for custom adapters.
-  private fun Field.getAdapterName(nameDelimiter: Char = '.'): CodeBlock {
-    return if (type().isMap) {
-      CodeBlock.of("%NAdapter", name())
-    } else {
-      type().getAdapterName(nameDelimiter)
+    // TODO add support for custom adapters.
+    private fun Field.getAdapterName(nameDelimiter: Char = '.'): CodeBlock {
+        return if (type().isMap) {
+            CodeBlock.of("%NAdapter", name())
+        } else {
+            type().getAdapterName(nameDelimiter)
+        }
     }
-  }
 
-  private fun ProtoType.getAdapterName(adapterFieldDelimiterName: Char = '.'): CodeBlock {
-    return when {
-      isScalar -> CodeBlock.of(
-          "%T$adapterFieldDelimiterName%L",
-          ProtoAdapter::class, simpleName().toUpperCase(Locale.US)
-      )
-      isMap -> throw IllegalArgumentException("Can't create single adapter for map type $this")
-      else -> CodeBlock.of("%T${adapterFieldDelimiterName}ADAPTER", typeName)
+    private fun ProtoType.getAdapterName(adapterFieldDelimiterName: Char = '.'): CodeBlock {
+        return when {
+            isScalar -> CodeBlock.of(
+                "%T$adapterFieldDelimiterName%L",
+                ProtoAdapter::class, simpleName().toUpperCase(Locale.US)
+            )
+            isMap -> throw IllegalArgumentException("Can't create single adapter for map type $this")
+            else -> CodeBlock.of("%T${adapterFieldDelimiterName}ADAPTER", typeName)
+        }
     }
-  }
 
-  /**
-   * Example
-   * ```
-   * enum class PhoneType(override val value: Int) : WireEnum {
-   *     HOME(0),
-   *     ...
-   *
-   *     companion object {
+    /**
+     * Example
+     * ```
+     * enum class PhoneType(override val value: Int) : WireEnum {
+     *     HOME(0),
+     *     ...
+     *
+     *     companion object {
    *       fun fromValue(value: Int): PhoneType = ...
    *
    *       val ADAPTER: ProtoAdapter<PhoneType> = ...
@@ -1347,13 +1329,21 @@ class BindingGenerator private constructor(
 
         for (service in protoFile.services()) {
           val className = ClassName(kotlinPackage, service.type().simpleName())
-          map[service.type()] = className
+            map[service.type()] = className
         }
       }
 
-      return BindingGenerator(schema, map, emitAndroid, javaInterop, rpcCallStyle, rpcRole)
+        return BindingGenerator(schema, map, emitAndroid, javaInterop, rpcCallStyle, rpcRole)
     }
   }
 }
 
 private fun ProtoFile.kotlinPackage() = javaPackage() ?: packageName() ?: ""
+
+val snakeRegex = "_[a-zA-Z]".toRegex()
+private fun String.snakeToLowerCamelCase(): String {
+    return snakeRegex.replace(this) {
+        it.value.replace("_", "")
+            .toUpperCase()
+    }
+}
