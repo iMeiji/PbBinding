@@ -23,6 +23,7 @@ import static com.squareup.wire.schema.Options.FILE_OPTIONS;
 
 public final class ProtoFile {
   static final ProtoMember JAVA_PACKAGE = ProtoMember.get(FILE_OPTIONS, "java_package");
+  static final ProtoMember JAVA_OUTER_CLASSNAME = ProtoMember.get(FILE_OPTIONS, "java_outer_classname");
 
   private final Location location;
   private final List<String> imports;
@@ -34,6 +35,7 @@ public final class ProtoFile {
   private final Options options;
   private final Syntax syntax;
   private Object javaPackage;
+  private Object javaOuterClassName;
 
   private ProtoFile(Location location, List<String> imports,
       List<String> publicImports, String packageName, List<Type> types,
@@ -122,7 +124,12 @@ public final class ProtoFile {
   }
 
   public String javaPackage() {
-    return javaPackage != null ? String.valueOf(javaPackage) : null;
+    if (javaPackage != null && javaOuterClassName!=null) {
+      return javaPackage +"." + javaOuterClassName;
+    } else if (javaPackage != null) {
+      return String.valueOf(javaPackage);
+    }
+    return null;
   }
 
   public List<Type> types() {
@@ -163,12 +170,14 @@ public final class ProtoFile {
         retainedTypes.build(), retainedServices.build(), extendList,
         options.retainAll(schema, markSet), syntax);
     result.javaPackage = javaPackage;
+    result.javaOuterClassName = javaOuterClassName;
     return result;
   }
 
   void linkOptions(Linker linker) {
     options.link(linker);
     javaPackage = options().get(JAVA_PACKAGE);
+    javaOuterClassName = options().get(JAVA_OUTER_CLASSNAME);
   }
 
   @Override public String toString() {
