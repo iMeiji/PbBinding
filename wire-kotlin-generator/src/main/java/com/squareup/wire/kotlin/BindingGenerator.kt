@@ -225,7 +225,7 @@ class BindingGenerator private constructor(
               newName("CREATOR", "CREATOR")
             }
             message.fieldsAndOneOfFields().forEach { field ->
-              newName(field.name().snakeToLowerCamelCase(), field)
+              newName(field.compatibleGooglePbFieldName().snakeToLowerCamelCase(), field)
             }
           }
         }
@@ -281,7 +281,10 @@ class BindingGenerator private constructor(
 
     type.nestedTypes().forEach { classBuilder.addType(generateType(it)) }
 
-    classBuilder.addModifiers(DATA)
+      // has property then add data modifier
+      if (classBuilder.propertySpecs.isNullOrEmpty().not()) {
+          classBuilder.addModifiers(DATA)
+      }
 
     return classBuilder.build()
   }
@@ -598,10 +601,9 @@ class BindingGenerator private constructor(
                     val itemType = field.type().typeName
                     if (field.isScalar) {
                         add(
-                            "this.%1N = pb.%2N.mapNotNull{%3T}\n",
+                            "this.%1N = pb.%2N.mapNotNull{it}\n",
                             fieldName,
-                            fieldName,
-                            itemType
+                            fieldName
                         )
                     } else {
                         add(
@@ -1345,5 +1347,13 @@ private fun String.snakeToLowerCamelCase(): String {
     return snakeRegex.replace(this) {
         it.value.replace("_", "")
             .toUpperCase()
+    }
+}
+
+private fun Field.compatibleGooglePbFieldName():String {
+    if (isRepeated) {
+        return name() + "List"
+    } else {
+        return name()
     }
 }
