@@ -579,6 +579,8 @@ class BindingGenerator private constructor(
         companionBuilder: TypeSpec.Builder,
         nameAllocator: NameAllocator
     ) {
+//        val pbClassPkg = type.typeName.packageName
+//        val pbArgs =  type.type().simpleName()
         val className = generatedTypeName(type)
         type.type().simpleName()
         val pbClassNameString = type.typeName.toString().replace(postfix, "")
@@ -597,8 +599,8 @@ class BindingGenerator private constructor(
             val fields = type.fieldsAndOneOfFields()
             for (field in fields) {
                 val fieldName = nameAllocator[field]
+                val itemType = field.type().typeName
                 if (field.isRepeated) { // list
-                    val itemType = field.type().typeName
                     if (field.isScalar) {
                         add(
                             "this.%1N = pb.%2N.mapNotNull{it}\n",
@@ -613,6 +615,13 @@ class BindingGenerator private constructor(
                             itemType
                         )
                     }
+                } else if(!field.isScalar) {
+                    add(
+                        "this.%1N = %2T.convert(pb.%3N)\n",
+                        fieldName,
+                        itemType,
+                        fieldName
+                    )
                 } else {
                     add("this.%1N = pb.%2N\n", fieldName, fieldName)
                 }
