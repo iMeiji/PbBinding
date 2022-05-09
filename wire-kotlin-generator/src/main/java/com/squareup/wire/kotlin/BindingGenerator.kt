@@ -32,7 +32,6 @@ import com.squareup.wire.MessageSource
 import com.squareup.wire.ProtoAdapter
 import com.squareup.wire.ProtoReader
 import com.squareup.wire.ProtoWriter
-import com.squareup.wire.WireEnum
 import com.squareup.wire.WireField
 import com.squareup.wire.WireRpc
 import com.squareup.wire.schema.*
@@ -63,6 +62,8 @@ class BindingGenerator private constructor(
         get() = type().typeName
     private val Service.serviceName
         get() = type().typeName
+    private val Type.typePbName
+        get() = schema.protoFile(location().path).javaPackage()
 
     /** Returns the full name of the class generated for [type].  */
     fun generatedTypeName(type: Type) = type.typeName
@@ -586,15 +587,14 @@ class BindingGenerator private constructor(
         companionBuilder: TypeSpec.Builder,
         nameAllocator: NameAllocator
     ) {
-//        val pbClassPkg = type.typeName.packageName
-//        val pbArgs =  type.type().simpleName()
         val className = generatedTypeName(type)
-        type.type().simpleName()
-        val pbClassNameString = type.typeName.toString().replace(postfix, "")
+        val typeSimpleName = type.type().simpleName()
+        val pbPackageName = type.typePbName
+        val pbClassName = ClassName(pbPackageName, typeSimpleName)
         val result = FunSpec.builder("convert")
             .jvmStatic()
             .addParameter(
-                ParameterSpec.builder("pb", ClassName.bestGuess(pbClassNameString)).build()
+                ParameterSpec.builder("pb", pbClassName).build()
             )
             .returns(type.typeName)
         val fieldNames = mutableListOf<String>()
@@ -1312,7 +1312,7 @@ class BindingGenerator private constructor(
     companion object {
         private val BUILT_IN_TYPES = mapOf(
             ProtoType.BOOL to BOOLEAN,
-            ProtoType.BYTES to ByteString::class.asClassName(),
+            ProtoType.BYTES to ClassName("com.google.protobuf\",\"ByteString"),
             ProtoType.DOUBLE to DOUBLE,
             ProtoType.FLOAT to FLOAT,
             ProtoType.FIXED32 to INT,
@@ -1388,4 +1388,4 @@ class BindingGenerator private constructor(
     }
 }
 
-private fun ProtoFile.kotlinPackage() = javaPackage() ?: packageName() ?: ""
+private fun ProtoFile.kotlinPackage() = javaPackage().toLowerCase() ?: packageName() ?: ""
