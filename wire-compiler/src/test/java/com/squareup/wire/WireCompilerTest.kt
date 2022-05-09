@@ -404,7 +404,7 @@ class WireCompilerTest {
 
   @Test
   fun testPersonKotlinBinding() {
-    val sources = arrayOf("app_event.proto")
+    val sources = arrayOf("activity_square.proto")
     compileToBinding(sources)
 
     val outputs = arrayOf("com/squareup/wire/protos/kotlin/person/Person.kt")
