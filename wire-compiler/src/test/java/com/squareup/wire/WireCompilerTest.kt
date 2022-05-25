@@ -404,7 +404,7 @@ class WireCompilerTest {
 
   @Test
   fun testPersonKotlinBinding() {
-    val sources = arrayOf("game_task.proto")
+    val sources = arrayOf("all_types.proto")
     compileToBinding(sources, "--excludes=google.protobuf.*")
 
     val outputs = arrayOf("com/squareup/wire/protos/kotlin/person/Person.kt")

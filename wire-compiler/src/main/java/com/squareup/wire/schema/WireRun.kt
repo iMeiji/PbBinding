@@ -17,6 +17,7 @@ package com.squareup.wire.schema
 
 import com.squareup.wire.ConsoleWireLogger
 import com.squareup.wire.WireLogger
+import com.squareup.wire.schema.SchemaLoader.*
 import java.nio.file.FileSystem
 import java.nio.file.FileSystems
 
@@ -148,7 +149,10 @@ data class WireRun(
     val protoFiles = schemaLoader.load()
 
     // 2. Load descriptor proto
-    val protoFilesPlusDescriptor = protoFiles.plus(schemaLoader.loadDescriptorProto())
+    val protoFilesPlusDescriptor = protoFiles
+      .plus(schemaLoader.loadDescriptorProto(DESCRIPTOR_PROTO))
+      .plus(schemaLoader.loadDescriptorProto(EMPTY_PROTO))
+      .plus(schemaLoader.loadDescriptorProto(FIELD_MASK_PROTO))
 
     // 3. Validate the schema and resolve references
     val fullSchema = Schema.fromFiles(protoFilesPlusDescriptor)

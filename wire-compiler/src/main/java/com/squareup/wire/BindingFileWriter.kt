@@ -15,8 +15,7 @@
  */
 package com.squareup.wire
 
-import com.squareup.kotlinpoet.FileSpec
-import com.squareup.kotlinpoet.TypeSpec
+import com.squareup.kotlinpoet.*
 import com.squareup.wire.kotlin.BindingGenerator
 import com.squareup.wire.schema.Location
 import com.squareup.wire.schema.Service
@@ -70,7 +69,7 @@ internal class BindingFileWriter(
   private fun generateFile(packageName: String, typeSpec: TypeSpec, location: Location?): FileSpec {
     return FileSpec.builder(packageName, typeSpec.name!!)
         .addComment(WireCompiler.CODE_GENERATED_BY_WIRE)
-        .indent("  ")
+        .indent("    ")
         .apply {
           if (location != null) {
             addComment("\nSource file: %L", location.withPathOnly())

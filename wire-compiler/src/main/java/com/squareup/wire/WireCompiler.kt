@@ -127,7 +127,11 @@ class WireCompiler internal constructor(
     for (protoFile in schema.protoFiles()) {
       // Check if we're skipping files not explicitly named.
       if (!sourceFileNames.isEmpty() && protoFile.location().path !in sourceFileNames) {
-        if (namedFilesOnly || protoFile.location().path == DESCRIPTOR_PROTO) continue
+        if (namedFilesOnly
+          || protoFile.location().path == DESCRIPTOR_PROTO
+          || protoFile.location().path == EMPTY_PROTO
+          || protoFile.location().path == FIELD_MASK_PROTO)
+          continue
       }
       queue.addAll(protoFile.types().map(::PendingTypeFileSpec))
       queue.addAll(protoFile.services().map(::PendingServiceFileSpec))
@@ -213,6 +217,8 @@ class WireCompiler internal constructor(
     private const val JAVA_INTEROP = "--java_interop"
     private const val MAX_WRITE_CONCURRENCY = 8
     private const val DESCRIPTOR_PROTO = "google/protobuf/descriptor.proto"
+    private const val EMPTY_PROTO = "google/protobuf/empty.proto"
+    private const val FIELD_MASK_PROTO = "google/protobuf/field_mask.proto"
 
     @Throws(IOException::class)
     @JvmStatic fun main(args: Array<String>) {

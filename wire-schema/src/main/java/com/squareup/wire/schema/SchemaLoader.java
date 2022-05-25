@@ -50,6 +50,8 @@ import static com.google.common.collect.Iterables.getOnlyElement;
  */
 public final class SchemaLoader {
   static final String DESCRIPTOR_PROTO = "google/protobuf/descriptor.proto";
+  static final String EMPTY_PROTO = "google/protobuf/empty.proto";
+  static final String FIELD_MASK_PROTO = "google/protobuf/field_mask.proto";
 
   private final List<Path> sources = new ArrayList<>();
   private final List<String> protos = new ArrayList<>();
@@ -124,7 +126,9 @@ public final class SchemaLoader {
     }
 
     Map<String, ProtoFile> loaded = new LinkedHashMap<>();
-    loaded.put(DESCRIPTOR_PROTO, loadDescriptorProto());
+    loaded.put(DESCRIPTOR_PROTO, loadDescriptorProto(DESCRIPTOR_PROTO));
+    loaded.put(EMPTY_PROTO, loadDescriptorProto(EMPTY_PROTO));
+    loaded.put(FIELD_MASK_PROTO, loadDescriptorProto(FIELD_MASK_PROTO));
 
     while (!protos.isEmpty()) {
       String proto = protos.removeFirst();
@@ -172,11 +176,11 @@ public final class SchemaLoader {
    * and java_package. If the user has provided their own version of the descriptor proto, that is
    * preferred.
    */
-  private ProtoFile loadDescriptorProto() throws IOException {
-    InputStream resourceAsStream = SchemaLoader.class.getResourceAsStream("/" + DESCRIPTOR_PROTO);
+  private ProtoFile loadDescriptorProto(String proto) throws IOException {
+    InputStream resourceAsStream = SchemaLoader.class.getResourceAsStream("/" + proto);
     try (BufferedSource buffer = Okio.buffer(Okio.source(resourceAsStream))) {
       String data = buffer.readUtf8();
-      Location location = Location.get("", DESCRIPTOR_PROTO);
+      Location location = Location.get("", proto);
       ProtoFileElement element = ProtoParser.parse(location, data);
       return ProtoFile.get(element);
     }

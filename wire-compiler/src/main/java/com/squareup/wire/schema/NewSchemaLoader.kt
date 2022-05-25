@@ -116,11 +116,11 @@ class NewSchemaLoader(
    * preferred.
    */
   @Throws(IOException::class)
-  fun loadDescriptorProto(): ProtoFile {
-    val resourceAsStream = SchemaLoader::class.java.getResourceAsStream("/$DESCRIPTOR_PROTO")
+  fun loadDescriptorProto(proto:String): ProtoFile {
+    val resourceAsStream = SchemaLoader::class.java.getResourceAsStream("/$proto")
     resourceAsStream.source().buffer().use { source ->
       val data = source.readUtf8()
-      val location = Location.get(DESCRIPTOR_PROTO)
+      val location = Location.get(proto)
       val element = ProtoParser.parse(location, data)
       return ProtoFile.get(element)
     }

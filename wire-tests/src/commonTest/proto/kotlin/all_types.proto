@@ -13,9 +13,9 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package squareup.protos.kotlin.alltypes;
+package squareup.protos.alltypes;
 
-option java_package = "com.squareup.wire.protos.kotlin.alltypes";
+option java_package = "com.squareup.wire.protos.alltypes";
 option java_outer_classname = "AlltypesProtos";
 
 message AllTypes {

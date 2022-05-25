@@ -606,7 +606,10 @@ class BindingGenerator private constructor(
             indent()
             val fields = type.fieldsAndOneOfFields()
             for (field in fields) {
-                val fieldName = nameAllocator[field]
+                if (field.isMap) {
+                    continue
+                }
+                val fieldName = nameAllocator[field].replace("_","")
                 val itemType = field.type().typeName
                 if (field.isRepeated) { // list
                     if (field.isScalar) {
@@ -685,7 +688,7 @@ class BindingGenerator private constructor(
 
         fields.forEach { field ->
             val fieldClass = field.typeName
-            val fieldName = nameAllocator[field]
+            val fieldName = nameAllocator[field].replace("_","")
 
             val parameterSpec = ParameterSpec.builder(fieldName, fieldClass)
 //            if (!field.isRequired) {
@@ -1344,7 +1347,7 @@ class BindingGenerator private constructor(
     companion object {
         private val BUILT_IN_TYPES = mapOf(
             ProtoType.BOOL to BOOLEAN,
-            ProtoType.BYTES to ClassName("com.google.protobuf\",\"ByteString"),
+            ProtoType.BYTES to ClassName("com.google.protobuf","ByteString"),
             ProtoType.DOUBLE to DOUBLE,
             ProtoType.FLOAT to FLOAT,
             ProtoType.FIXED32 to INT,
@@ -1422,4 +1425,38 @@ class BindingGenerator private constructor(
     }
 }
 
-private fun ProtoFile.kotlinPackage() = javaPackage().toLowerCase() ?: packageName() ?: ""
+private fun ProtoFile.kotlinPackage() = javaPackage()?.toLowerCase() ?: packageName() ?: ""
+
+// https://github.com/JetBrains/kotlin/blob/master/core/descriptors/src/org/jetbrains/kotlin/renderer/KeywordStringsGenerated.java
+private val KEYWORDS = setOf(
+    "package",
+    "as",
+    "typealias",
+    "class",
+    "this",
+    "super",
+    "val",
+    "var",
+    "fun",
+    "for",
+    "null",
+    "true",
+    "false",
+    "is",
+    "in",
+    "throw",
+    "return",
+    "break",
+    "continue",
+    "object",
+    "if",
+    "try",
+    "else",
+    "while",
+    "do",
+    "when",
+    "interface",
+    "typeof"
+)
+private val String.isKeyword get() = this in KEYWORDS
+private fun String.escapeIfKeyword() = if (isKeyword) "`$this`" else this
