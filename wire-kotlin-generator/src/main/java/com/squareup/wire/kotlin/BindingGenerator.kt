@@ -615,6 +615,13 @@ class BindingGenerator private constructor(
                             fieldName,
                             fieldName
                         )
+                    } else if(field.type().isEnum){
+                        add(
+                            "this.%1N = pb.%2N.mapNotNull{%3T.fromValue(it.number)}\n",
+                            fieldName,
+                            fieldName,
+                            itemType
+                        )
                     } else {
                         add(
                             "this.%1N = pb.%2N.mapNotNull{%3T.convert(it)}\n",
@@ -624,12 +631,21 @@ class BindingGenerator private constructor(
                         )
                     }
                 } else if (field.type().isEnum) {
-                    add(
-                        "this.%1N = %2T.fromValue(pb.%3N)\n",
-                        fieldName,
-                        itemType,
-                        fieldName
-                    )
+                    if (field.isOptional) {
+                        add(
+                            "this.%1N = %2T.fromValue(pb.%3N.number)\n",
+                            fieldName,
+                            itemType,
+                            field.name().snakeToLowerCamelCase()
+                        )
+                    } else {
+                        add(
+                            "this.%1N = %2T.fromValue(pb.%3N)\n",
+                            fieldName,
+                            itemType,
+                            fieldName
+                        )
+                    }
                 } else if (!field.isScalar) {
                     add(
                         "this.%1N = %2T.convert(pb.%3N)\n",
@@ -672,9 +688,9 @@ class BindingGenerator private constructor(
             val fieldName = nameAllocator[field]
 
             val parameterSpec = ParameterSpec.builder(fieldName, fieldClass)
-            if (!field.isRequired) {
-                parameterSpec.defaultValue(field.defaultValue)
-            }
+//            if (!field.isRequired) {
+            parameterSpec.defaultValue(field.defaultValue)
+//            }
 
 //      if (field.isDeprecated) {
 //        parameterSpec.addAnnotation(AnnotationSpec.builder(Deprecated::class)
@@ -1182,7 +1198,7 @@ class BindingGenerator private constructor(
     }
 
     private fun generateEnumCompanion(message: EnumType): TypeSpec {
-        val parentClassName = nameToKotlinName.getValue(message.type())
+        val parentClassName = nameToKotlinName.getValue(message.type()).copy(nullable = true)
         val nameAllocator = nameAllocator(message)
         val valueName = nameAllocator["value"]
         val fromValue = FunSpec.builder("fromValue")
@@ -1194,7 +1210,7 @@ class BindingGenerator private constructor(
                 message.constants().forEach { constant ->
                     addCode("%L -> %L\n", constant.tag, nameAllocator[constant])
                 }
-                addCode("else -> throw IllegalArgumentException(%P)", "Unexpected value: \$value")
+                addCode("else -> null")
                 addCode("\n⇤}\n") // close the block
             }
             .build()
@@ -1298,7 +1314,10 @@ class BindingGenerator private constructor(
         get() = when {
             isRepeated -> List::class.asClassName().parameterizedBy(type().typeName)
             isMap -> Map::class.asTypeName().parameterizedBy(keyType.typeName, valueType.typeName)
-            !isRequired -> type().typeName.copy(nullable = true)
+//            !isRequired -> type().typeName.copy(nullable = true)
+            defaultValue == CodeBlock.of("null") -> {
+                type().typeName.copy(nullable = true)
+            }
             else -> type().typeName
         }
 
@@ -1306,6 +1325,19 @@ class BindingGenerator private constructor(
         get() = when {
             isRepeated -> CodeBlock.of("emptyList()")
             isMap -> CodeBlock.of("emptyMap()")
+            type() == ProtoType.BOOL ->CodeBlock.of("false")
+            type() == ProtoType.INT32  -> CodeBlock.of("0")
+            type() == ProtoType.FIXED32  -> CodeBlock.of("0")
+            type() == ProtoType.SINT32  -> CodeBlock.of("0")
+            type() == ProtoType.UINT32  -> CodeBlock.of("0")
+            type() == ProtoType.INT64  -> CodeBlock.of("0L")
+            type() == ProtoType.FIXED64  -> CodeBlock.of("0L")
+            type() == ProtoType.SINT64  -> CodeBlock.of("0L")
+            type() == ProtoType.UINT64  -> CodeBlock.of("0L")
+            type() == ProtoType.FIXED64  -> CodeBlock.of("0L")
+            type() == ProtoType.DOUBLE  -> CodeBlock.of("0.0")
+            type() == ProtoType.FLOAT  -> CodeBlock.of("0F")
+            type() == ProtoType.STRING  -> CodeBlock.of("\"\"")
             else -> CodeBlock.of("null")
         }
 
@@ -1369,12 +1401,14 @@ class BindingGenerator private constructor(
         }
     }
 
-    val snakeRegex = "_[a-zA-Z]".toRegex()
+    val snakeRegex = "_[a-zA-Z\\d]".toRegex()
     private fun String.snakeToLowerCamelCase(): String {
-        return snakeRegex.replace(this) {
+        var case = snakeRegex.replace(this) {
             it.value.replace("_", "")
                 .toUpperCase()
         }
+        case = case.replaceFirst(case.first(), case.first().toLowerCase())
+        return case.replace("\\d\\D\\d\\D".toRegex()) { it.value.toUpperCase() }
     }
 
     private fun Field.compatibleGooglePbFieldName(): String {
