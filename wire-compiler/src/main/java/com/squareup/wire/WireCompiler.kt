@@ -97,7 +97,8 @@ class WireCompiler internal constructor(
   val emitAndroid: Boolean,
   val emitAndroidAnnotations: Boolean,
   val emitCompact: Boolean,
-  val javaInterop: Boolean
+  val javaInterop: Boolean,
+  val cakeAdapter: Boolean
 ) {
 
   @Throws(IOException::class)
@@ -171,7 +172,7 @@ class WireCompiler internal constructor(
       }
 
       bindingOut != null -> {
-        val bindingGenerator = BindingGenerator(schema, emitAndroid, javaInterop)
+        val bindingGenerator = BindingGenerator(schema, emitAndroid, javaInterop, cakeAdapter)
 
         // No services for Binding.
         val types = ConcurrentLinkedQueue(queue.filterIsInstance<PendingTypeFileSpec>())
@@ -205,6 +206,7 @@ class WireCompiler internal constructor(
     private const val JAVA_OUT_FLAG = "--java_out="
     private const val KOTLIN_OUT_FLAG = "--kotlin_out="
     private const val BINDING_OUT_FLAG = "--binding_out="
+    private const val CAKE_ADAPTER_FLAG = "--cake_adapter"
     private const val FILES_FLAG = "--files="
     private const val INCLUDES_FLAG = "--includes="
     private const val EXCLUDES_FLAG = "--excludes="
@@ -253,6 +255,7 @@ class WireCompiler internal constructor(
       var emitAndroidAnnotations = false
       var emitCompact = false
       var javaInterop = false
+      var cakeAdapter = false
 
       for (arg in args) {
         when {
@@ -306,6 +309,7 @@ class WireCompiler internal constructor(
           arg == ANDROID_ANNOTATIONS -> emitAndroidAnnotations = true
           arg == COMPACT -> emitCompact = true
           arg == JAVA_INTEROP -> javaInterop = true
+          arg == CAKE_ADAPTER_FLAG -> cakeAdapter = true
           arg.startsWith("--") -> throw IllegalArgumentException("Unknown argument '$arg'.")
           else -> sourceFileNames.add(arg)
         }
@@ -320,7 +324,7 @@ class WireCompiler internal constructor(
       return WireCompiler(
         fileSystem, logger, protoPaths, javaOut, kotlinOut, bindingOut, sourceFileNames,
         identifierSetBuilder.build(), dryRun, namedFilesOnly, emitAndroid, emitAndroidAnnotations,
-        emitCompact, javaInterop
+        emitCompact, javaInterop, cakeAdapter
       )
     }
   }

@@ -49,6 +49,7 @@ class BindingGenerator private constructor(
     private val nameToKotlinName: Map<ProtoType, ClassName>,
     private val emitAndroid: Boolean,
     private val javaInterOp: Boolean,
+    private val cakeAdapter: Boolean,
     private val rpcCallStyle: RpcCallStyle,
     private val rpcRole: RpcRole
 ) {
@@ -254,6 +255,26 @@ class BindingGenerator private constructor(
 
         val classBuilder = TypeSpec.classBuilder(className)
             .apply { if (type.documentation().isNotBlank()) addKdoc("%L\n", type.documentation()) }
+
+        if (cakeAdapter) {
+            // ============ 添加 cake 接口和函数 ===========
+            val protobufResponseParserClassName = ClassName("com.audionew.net.cake.parser", "ProtobufResponseParser")
+            val typeSimpleName = type.type().simpleName()
+            val pbPackageName = type.typePbName
+            val pbClassName = ClassName(pbPackageName, typeSimpleName)
+            classBuilder.addSuperinterface(
+                protobufResponseParserClassName.parameterizedBy(listOf(className, pbClassName))
+            )
+            classBuilder.addFunction(FunSpec.builder("parseResponse")
+                .addModifiers(OVERRIDE)
+                .addParameter("message", pbClassName)
+                .addCode(CodeBlock.of("return convert(message)"))
+                .returns(className)
+                .build()
+            )
+        }
+        // ============ 添加 cake 接口和函数 ===========
+
 //        .superclass(if (javaInterOp) {
 //          superclass.parameterizedBy(className, builderClassName)
 //        } else {
@@ -1375,6 +1396,7 @@ class BindingGenerator private constructor(
             schema: Schema,
             emitAndroid: Boolean = false,
             javaInterop: Boolean = false,
+            cakeAdapter: Boolean = false,
             rpcCallStyle: RpcCallStyle = RpcCallStyle.SUSPENDING,
             rpcRole: RpcRole = RpcRole.CLIENT
         ): BindingGenerator {
@@ -1400,7 +1422,7 @@ class BindingGenerator private constructor(
                 }
             }
 
-            return BindingGenerator(schema, map, emitAndroid, javaInterop, rpcCallStyle, rpcRole)
+            return BindingGenerator(schema, map, emitAndroid, javaInterop, cakeAdapter, rpcCallStyle, rpcRole)
         }
     }
 

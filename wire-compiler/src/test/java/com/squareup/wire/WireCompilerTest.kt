@@ -412,6 +412,15 @@ class WireCompilerTest {
   }
 
   @Test
+  fun testPersonKotlinBindingCakeAdapter() {
+    val sources = arrayOf("all_types.proto")
+    compileToBinding(sources, "--excludes=google.protobuf.*", "--cake_adapter")
+
+    val outputs = arrayOf("com/squareup/wire/protos/kotlin/person/Person.kt")
+    assertKotlinOutputs(outputs)
+  }
+
+  @Test
   fun testPersonAndroidKotlin() {
     val sources = arrayOf("person.proto")
     compileToKotlin(sources, "--android")
