@@ -50,6 +50,7 @@ class BindingGenerator private constructor(
     private val emitAndroid: Boolean,
     private val javaInterOp: Boolean,
     private val cakeAdapter: Boolean,
+    private val fromRaw: Boolean,
     private val rpcCallStyle: RpcCallStyle,
     private val rpcRole: RpcRole
 ) {
@@ -273,6 +274,12 @@ class BindingGenerator private constructor(
                 .build()
             )
         }
+
+        if (fromRaw) {
+            // ============ 添加从 ByteArray 转 binding 函数 ===========
+            addFromByteArrayMethod(type, companionBuilder, nameAllocator)
+        }
+
         // ============ 添加 cake 接口和函数 ===========
 
 //        .superclass(if (javaInterOp) {
@@ -747,6 +754,40 @@ class BindingGenerator private constructor(
 //            .build())
 
         classBuilder.primaryConstructor(constructorBuilder.build())
+    }
+
+    private fun addFromByteArrayMethod(
+        type: MessageType,
+        companionBuilder: TypeSpec.Builder,
+        nameAllocator: NameAllocator
+    ) {
+        val className = generatedTypeName(type)
+        val typeSimpleName = type.type().simpleName()
+        val pbPackageName = type.typePbName
+        val pbClassName = ClassName(pbPackageName, typeSimpleName)
+        val result = FunSpec.builder("fromByteArray")
+            .jvmStatic()
+            .addParameter(
+                ParameterSpec.builder("raw", ClassName("kotlin", "ByteArray")).build()
+            )
+            .returns(type.typeName.copy(nullable = true))
+        val fieldNames = mutableListOf<String>()
+
+        val body = buildCodeBlock {
+            add("return try {\n")
+            indent()
+            add("val pb = %T.parseFrom(raw)\n", pbClassName)
+            add("convert(pb)\n")
+            unindent()
+            add("} catch (e: com.google.protobuf.InvalidProtocolBufferException) {\n")
+            indent()
+            add("e.printStackTrace()\n")
+            add("null\n")
+            unindent()
+            add("}\n")
+        }
+        result.addCode(body)
+        companionBuilder.addFunction(result.build())
     }
 
     private fun wireFieldAnnotation(field: Field): AnnotationSpec {
@@ -1397,6 +1438,7 @@ class BindingGenerator private constructor(
             emitAndroid: Boolean = false,
             javaInterop: Boolean = false,
             cakeAdapter: Boolean = false,
+            fromRaw: Boolean = false,
             rpcCallStyle: RpcCallStyle = RpcCallStyle.SUSPENDING,
             rpcRole: RpcRole = RpcRole.CLIENT
         ): BindingGenerator {
@@ -1422,7 +1464,7 @@ class BindingGenerator private constructor(
                 }
             }
 
-            return BindingGenerator(schema, map, emitAndroid, javaInterop, cakeAdapter, rpcCallStyle, rpcRole)
+            return BindingGenerator(schema, map, emitAndroid, javaInterop, cakeAdapter, fromRaw, rpcCallStyle, rpcRole)
         }
     }
 
