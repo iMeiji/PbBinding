@@ -276,11 +276,10 @@ class BindingGenerator private constructor(
         }
 
         if (fromRaw) {
-            // ============ 添加从 ByteArray 转 binding 函数 ===========
-            addFromByteArrayMethod(type, companionBuilder, nameAllocator)
+            // ============ 添加从 ByteArray/ByteString 转 binding 函数 ===========
+            addFromByteMethod(type, companionBuilder)
         }
 
-        // ============ 添加 cake 接口和函数 ===========
 
 //        .superclass(if (javaInterOp) {
 //          superclass.parameterizedBy(className, builderClassName)
@@ -756,22 +755,26 @@ class BindingGenerator private constructor(
         classBuilder.primaryConstructor(constructorBuilder.build())
     }
 
-    private fun addFromByteArrayMethod(
+    private fun addFromByteMethod(
         type: MessageType,
-        companionBuilder: TypeSpec.Builder,
-        nameAllocator: NameAllocator
+        companionBuilder: TypeSpec.Builder
     ) {
-        val className = generatedTypeName(type)
         val typeSimpleName = type.type().simpleName()
         val pbPackageName = type.typePbName
         val pbClassName = ClassName(pbPackageName, typeSimpleName)
-        val result = FunSpec.builder("fromByteArray")
+        val convertFromByteArrayFunc = FunSpec.builder("convert")
             .jvmStatic()
             .addParameter(
                 ParameterSpec.builder("raw", ClassName("kotlin", "ByteArray")).build()
             )
             .returns(type.typeName.copy(nullable = true))
-        val fieldNames = mutableListOf<String>()
+
+        val convertFromByteStringFunc = FunSpec.builder("convert")
+            .jvmStatic()
+            .addParameter(
+                ParameterSpec.builder("raw", ProtoType.BYTES.typeName).build()
+            )
+            .returns(type.typeName.copy(nullable = true))
 
         val body = buildCodeBlock {
             add("return try {\n")
@@ -786,8 +789,10 @@ class BindingGenerator private constructor(
             unindent()
             add("}\n")
         }
-        result.addCode(body)
-        companionBuilder.addFunction(result.build())
+        convertFromByteArrayFunc.addCode(body)
+        convertFromByteStringFunc.addCode(body)
+        companionBuilder.addFunction(convertFromByteArrayFunc.build())
+        companionBuilder.addFunction(convertFromByteStringFunc.build())
     }
 
     private fun wireFieldAnnotation(field: Field): AnnotationSpec {
