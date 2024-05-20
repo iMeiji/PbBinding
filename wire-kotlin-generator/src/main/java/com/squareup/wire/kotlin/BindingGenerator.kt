@@ -259,7 +259,7 @@ class BindingGenerator private constructor(
 
         if (cakeAdapter) {
             // ============ 添加 cake 接口和函数 ===========
-            val protobufResponseParserClassName = ClassName("com.audionew.net.cake.parser", "ProtobufResponseParser")
+            val protobufResponseParserClassName = ClassName("com.mico.cake.parser", "ProtobufResponseParser")
             val typeSimpleName = type.type().simpleName()
             val pbPackageName = type.typePbName
             val pbClassName = ClassName(pbPackageName, typeSimpleName)
