@@ -633,12 +633,35 @@ class BindingGenerator private constructor(
             indent()
             val fields = type.fieldsAndOneOfFields()
             for (field in fields) {
-                if (field.isMap) {
-                    continue
-                }
                 val fieldName = nameAllocator[field].replace("_","")
-                val itemType = field.type().typeName
-                if (field.isRepeated) { // list
+                val itemType = if (field.isMap) {
+                    field.valueType.typeName
+                } else {
+                    field.type().typeName
+                }
+                if (field.isMap) {
+                    if (field.valueType.isScalar) {
+                        add(
+                            "this.%1N = pb.%2N.mapValues { it.value }\n",
+                            fieldName,
+                            fieldName
+                        )
+                    } else if (field.valueType.isEnum) {
+                        add(
+                            "this.%1N = pb.%2N.mapValues { %3T.fromValue(it.value.number) }\n",
+                            fieldName,
+                            fieldName,
+                            itemType
+                        )
+                    } else {
+                        add(
+                            "this.%1N = pb.%2N.mapValues { %3T.convert(it.value) }\n",
+                            fieldName,
+                            fieldName,
+                            itemType
+                        )
+                    }
+                } else if (field.isRepeated) { // list
                     if (field.isScalar) {
                         add(
                             "this.%1N = pb.%2N.mapNotNull{it}\n",
@@ -1484,7 +1507,9 @@ class BindingGenerator private constructor(
     }
 
     private fun Field.compatibleGooglePbFieldName(): String {
-        if (isRepeated) {
+        if (isMap){
+            return name() + "Map"
+        } else if (isRepeated) {
             return name() + "List"
         } else if (type().isEnum) {
             return name() + "Value"
