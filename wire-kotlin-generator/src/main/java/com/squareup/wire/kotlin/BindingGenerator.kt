@@ -799,6 +799,13 @@ class BindingGenerator private constructor(
             )
             .returns(type.typeName.copy(nullable = true))
 
+        val convertFromByteBufferFunc = FunSpec.builder("convert")
+            .jvmStatic()
+            .addParameter(
+                ParameterSpec.builder("raw", ClassName("java.nio", "ByteBuffer")).build()
+            )
+            .returns(type.typeName.copy(nullable = true))
+
         val body = buildCodeBlock {
             add("return try {\n")
             indent()
@@ -814,8 +821,10 @@ class BindingGenerator private constructor(
         }
         convertFromByteArrayFunc.addCode(body)
         convertFromByteStringFunc.addCode(body)
+        convertFromByteBufferFunc.addCode(body)
         companionBuilder.addFunction(convertFromByteArrayFunc.build())
         companionBuilder.addFunction(convertFromByteStringFunc.build())
+        companionBuilder.addFunction(convertFromByteBufferFunc.build())
     }
 
     private fun wireFieldAnnotation(field: Field): AnnotationSpec {
